@@ -31,7 +31,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const wsUrl = `${websocketUrl}/media-stream`;
 
     // Generate TwiML to connect to media stream
-    const twiml = generateMediaStreamTwiML(wsUrl, callSid);
+    // Pass the 'to' field (the number being called) so the WebSocket server knows the phoneNumber
+    const twiml = generateMediaStreamTwiML(wsUrl, callSid, to);
 
     console.log(`[Webhook] Returning TwiML to connect to: ${wsUrl}`);
 

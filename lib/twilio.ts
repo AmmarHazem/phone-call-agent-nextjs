@@ -37,13 +37,15 @@ export async function initiateCall(
  */
 export function generateMediaStreamTwiML(
   websocketUrl: string,
-  callSid: string
+  callSid: string,
+  phoneNumber: string
 ): string {
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
     <Stream url="${websocketUrl}">
       <Parameter name="callSid" value="${callSid}" />
+      <Parameter name="phoneNumber" value="${phoneNumber}" />
     </Stream>
   </Connect>
 </Response>`;
