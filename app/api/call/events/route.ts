@@ -1,8 +1,26 @@
 import { NextRequest } from "next/server";
+import { EventEmitter } from "events";
 
-// Store for SSE connections
-const sseConnections = new Map<string, Set<ReadableStreamDefaultController>>();
+// Singleton event emitter for SSE broadcasting
+// Using globalThis to persist across hot reloads in development
+const globalForEvents = globalThis as unknown as {
+  sseEmitter: EventEmitter | undefined;
+  sseConnections: Map<string, Set<ReadableStreamDefaultController>> | undefined;
+};
 
+if (!globalForEvents.sseEmitter) {
+  globalForEvents.sseEmitter = new EventEmitter();
+  globalForEvents.sseEmitter.setMaxListeners(100);
+}
+
+if (!globalForEvents.sseConnections) {
+  globalForEvents.sseConnections = new Map();
+}
+
+const sseEmitter = globalForEvents.sseEmitter;
+const sseConnections = globalForEvents.sseConnections;
+
+// GET: Browser connects here for SSE stream
 export async function GET(request: NextRequest): Promise<Response> {
   const searchParams = request.nextUrl.searchParams;
   const callSid = searchParams.get("callSid");
@@ -10,12 +28,6 @@ export async function GET(request: NextRequest): Promise<Response> {
   if (!callSid) {
     return new Response("callSid is required", { status: 400 });
   }
-
-  // Get the WebSocket server URL to poll for session data
-  const wsServerUrl = process.env.WEBSOCKET_SERVER_URL?.replace(
-    "wss://",
-    "https://",
-  ).replace("ws://", "http://");
 
   const stream = new ReadableStream({
     start(controller) {
@@ -29,74 +41,45 @@ export async function GET(request: NextRequest): Promise<Response> {
       const connectMessage = `data: ${JSON.stringify({ type: "connected", callSid })}\n\n`;
       controller.enqueue(new TextEncoder().encode(connectMessage));
 
-      // Poll the Express server for updates
-      let lastTranscriptCount = 0;
-      const pollInterval = setInterval(async () => {
-        console.log("--- start polling events", wsServerUrl);
+      // Listen for events pushed from the WebSocket server
+      const eventHandler = (event: { type: string; data: unknown }) => {
         try {
-          if (!wsServerUrl) {
-            return;
-          }
-
-          const response = await fetch(`${wsServerUrl}/session/${callSid}`);
-          const session = await response.json();
-          console.log("call events session polling", JSON.stringify(session));
-          if (!response.ok) {
-            if (response.status === 404) {
-              // Session not found - might not have started yet
-              return;
-            }
-            const responseBody = await response.json();
-            console.error(
-              `[SSE] Error fetching session: ${response.status}`,
-              responseBody,
-            );
-            return;
-          }
-
-          // Send status update
-          const statusMessage = `data: ${JSON.stringify({
-            type: "status",
+          const message = `data: ${JSON.stringify({
+            type: event.type,
             callSid,
-            data: { status: session.status, timestamp: new Date() },
+            data: event.data,
           })}\n\n`;
-          controller.enqueue(new TextEncoder().encode(statusMessage));
+          controller.enqueue(new TextEncoder().encode(message));
 
-          // Send new transcript messages
+          // Close connection if call ended
+          const status = (event.data as { status?: string })?.status;
           if (
-            session.transcript &&
-            session.transcript.length > lastTranscriptCount
+            event.type === "status" &&
+            (status === "completed" || status === "failed")
           ) {
-            const newMessages = session.transcript.slice(lastTranscriptCount);
-            for (const message of newMessages) {
-              const transcriptMessage = `data: ${JSON.stringify({
-                type: "transcript",
-                callSid,
-                data: { message },
-              })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(transcriptMessage));
-            }
-            lastTranscriptCount = session.transcript.length;
-          }
-
-          // Check if call is completed
-          if (session.status === "completed" || session.status === "failed") {
-            clearInterval(pollInterval);
+            cleanup();
             controller.close();
           }
-        } catch (error) {
-          console.error("[SSE] Error polling session:", error);
+        } catch (e) {
+          // Controller might be closed
+          console.log("/call/events eventHandler() error", e);
         }
-      }, 1000); // Poll every second
+      };
 
-      // Clean up on close
-      request.signal.addEventListener("abort", () => {
-        clearInterval(pollInterval);
+      // Subscribe to events for this callSid
+      sseEmitter.on(`call:${callSid}`, eventHandler);
+
+      // Cleanup function
+      const cleanup = () => {
+        sseEmitter.off(`call:${callSid}`, eventHandler);
         sseConnections.get(callSid)?.delete(controller);
         if (sseConnections.get(callSid)?.size === 0) {
           sseConnections.delete(callSid);
         }
-      });
+      };
+
+      // Clean up on client disconnect
+      request.signal.addEventListener("abort", cleanup);
     },
   });
 
@@ -109,18 +92,27 @@ export async function GET(request: NextRequest): Promise<Response> {
   });
 }
 
-// Helper function to broadcast events to all connected clients for a call
-export function broadcastEvent(callSid: string, event: unknown): void {
-  const controllers = sseConnections.get(callSid);
-  if (controllers) {
-    const message = `data: ${JSON.stringify(event)}\n\n`;
-    const encoded = new TextEncoder().encode(message);
-    controllers.forEach((controller) => {
-      try {
-        controller.enqueue(encoded);
-      } catch {
-        // Controller might be closed
-      }
-    });
+// POST: WebSocket server calls this to push events
+export async function POST(request: NextRequest): Promise<Response> {
+  try {
+    const body = await request.json();
+    const { callSid, type, data } = body;
+
+    if (!callSid || !type) {
+      return Response.json(
+        { error: "callSid and type are required" },
+        { status: 400 },
+      );
+    }
+
+    console.log(`[SSE] Received push event: ${type} for call ${callSid}`);
+
+    // Emit the event to all SSE listeners for this call
+    sseEmitter.emit(`call:${callSid}`, { type, data });
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("[SSE] Error processing push event:", error);
+    return Response.json({ error: "Failed to process event" }, { status: 500 });
   }
 }

@@ -6,12 +6,6 @@ import {
 } from "@/lib/twilio";
 import type { InitiateCallRequest, InitiateCallResponse } from "@/types/call";
 
-// In-memory store for active calls (shared with Express server via HTTP)
-const activeCalls = new Map<
-  string,
-  { phoneNumber: string; status: string; startTime: Date }
->();
-
 export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<InitiateCallResponse>> {
@@ -75,13 +69,6 @@ export async function POST(
       statusCallbackUrl,
     );
 
-    // Store call info
-    activeCalls.set(callSid, {
-      phoneNumber: formattedNumber,
-      status: "initiating",
-      startTime: new Date(),
-    });
-
     console.log(`[API] Call initiated: ${callSid} to ${formattedNumber}`);
 
     return NextResponse.json<InitiateCallResponse>({
@@ -99,6 +86,3 @@ export async function POST(
     );
   }
 }
-
-// Export active calls for other routes
-export { activeCalls };
