@@ -38,14 +38,25 @@ export async function initiateCall(
 export function generateMediaStreamTwiML(
   websocketUrl: string,
   callSid: string,
-  phoneNumber: string
+  phoneNumber: string,
+  systemPrompt?: string
 ): string {
+  // Build parameters
+  let parameters = `
+      <Parameter name="callSid" value="${callSid}" />
+      <Parameter name="phoneNumber" value="${phoneNumber}" />`;
+
+  // Add system prompt if provided (base64 encoded to handle special characters)
+  if (systemPrompt) {
+    const encodedPrompt = Buffer.from(systemPrompt).toString("base64");
+    parameters += `
+      <Parameter name="systemPrompt" value="${encodedPrompt}" />`;
+  }
+
   const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${websocketUrl}">
-      <Parameter name="callSid" value="${callSid}" />
-      <Parameter name="phoneNumber" value="${phoneNumber}" />
+    <Stream url="${websocketUrl}">${parameters}
     </Stream>
   </Connect>
 </Response>`;

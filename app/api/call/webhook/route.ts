@@ -3,6 +3,20 @@ import { generateMediaStreamTwiML } from "@/lib/twilio";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
+    // Extract system prompt from URL query params
+    const url = new URL(request.url);
+    const encodedSystemPrompt = url.searchParams.get("systemPrompt");
+    let systemPrompt: string | undefined;
+
+    if (encodedSystemPrompt) {
+      try {
+        systemPrompt = Buffer.from(decodeURIComponent(encodedSystemPrompt), "base64").toString("utf-8");
+        console.log(`[Webhook] Custom system prompt received (${systemPrompt.length} chars)`);
+      } catch (e) {
+        console.error("[Webhook] Failed to decode system prompt:", e);
+      }
+    }
+
     // Parse the form data from Twilio
     const formData = await request.formData();
     const callSid = formData.get("CallSid") as string;
@@ -32,7 +46,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Generate TwiML to connect to media stream
     // Pass the 'to' field (the number being called) so the WebSocket server knows the phoneNumber
-    const twiml = generateMediaStreamTwiML(wsUrl, callSid, to);
+    const twiml = generateMediaStreamTwiML(wsUrl, callSid, to, systemPrompt);
 
     console.log(`[Webhook] Returning TwiML to connect to: ${wsUrl}`);
 

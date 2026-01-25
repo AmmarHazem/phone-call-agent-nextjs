@@ -68,6 +68,7 @@ export interface TwilioOutboundMessage {
 // API request/response types
 export interface InitiateCallRequest {
   phoneNumber: string;
+  systemPrompt?: string;
 }
 
 export interface InitiateCallResponse {
