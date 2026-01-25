@@ -19,7 +19,7 @@ interface CallState {
 
 interface UseCallReturn {
   state: CallState;
-  initiateCall: (phoneNumber: string) => Promise<void>;
+  initiateCall: (phoneNumber: string, systemPrompt?: string) => Promise<void>;
   endCall: () => Promise<void>;
   isActive: boolean;
 }
@@ -134,7 +134,7 @@ export function useCall(): UseCallReturn {
 
   // Initiate a call
   const initiateCall = useCallback(
-    async (phoneNumber: string) => {
+    async (phoneNumber: string, systemPrompt?: string) => {
       setState({
         ...initialState,
         status: "initiating",
@@ -145,7 +145,7 @@ export function useCall(): UseCallReturn {
         const response = await fetch("/api/call/initiate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber }),
+          body: JSON.stringify({ phoneNumber, systemPrompt }),
         });
 
         const data: InitiateCallResponse = await response.json();

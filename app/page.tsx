@@ -9,8 +9,8 @@ import { useCall } from "@/hooks/useCall";
 export default function Home() {
   const { state, initiateCall, endCall, isActive } = useCall();
 
-  const handleCall = async (phoneNumber: string) => {
-    await initiateCall(phoneNumber);
+  const handleCall = async (phoneNumber: string, systemPrompt?: string) => {
+    await initiateCall(phoneNumber, systemPrompt);
   };
 
   const handleEndCall = async () => {

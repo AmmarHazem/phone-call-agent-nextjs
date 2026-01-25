@@ -11,7 +11,7 @@ export async function POST(
 ): Promise<NextResponse<InitiateCallResponse>> {
   try {
     const body: InitiateCallRequest = await request.json();
-    const { phoneNumber } = body;
+    const { phoneNumber, systemPrompt } = body;
 
     if (!phoneNumber) {
       return NextResponse.json(
@@ -59,7 +59,14 @@ export async function POST(
     }
 
     // Construct webhook URLs
-    const webhookUrl = `${appUrl}/api/call/webhook`;
+    let webhookUrl = `${appUrl}/api/call/webhook`;
+
+    // If custom system prompt provided, encode and append to webhook URL
+    if (systemPrompt) {
+      const encodedPrompt = Buffer.from(systemPrompt).toString("base64");
+      webhookUrl = `${webhookUrl}?systemPrompt=${encodeURIComponent(encodedPrompt)}`;
+    }
+
     const statusCallbackUrl = `${appUrl}/api/call/status`;
 
     // Initiate the call
