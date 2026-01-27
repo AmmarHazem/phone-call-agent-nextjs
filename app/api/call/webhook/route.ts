@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateMediaStreamTwiML } from "@/lib/twilio";
+import { registerCall } from "@/lib/elevenlabs";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -10,8 +10,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (encodedSystemPrompt) {
       try {
-        systemPrompt = Buffer.from(decodeURIComponent(encodedSystemPrompt), "base64").toString("utf-8");
-        console.log(`[Webhook] Custom system prompt received (${systemPrompt.length} chars)`);
+        systemPrompt = Buffer.from(
+          decodeURIComponent(encodedSystemPrompt),
+          "base64"
+        ).toString("utf-8");
+        console.log(
+          `[Webhook] Custom system prompt received (${systemPrompt.length} chars)`
+        );
       } catch (e) {
         console.error("[Webhook] Failed to decode system prompt:", e);
       }
@@ -26,11 +31,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`[Webhook] Call ${callSid}: ${callStatus} (${from} -> ${to})`);
 
-    // Get the WebSocket server URL
-    const websocketUrl = process.env.WEBSOCKET_SERVER_URL;
-    if (!websocketUrl) {
-      console.error("[Webhook] WEBSOCKET_SERVER_URL not configured");
-      // Return a TwiML that says there's an error
+    // Get ElevenLabs agent ID
+    const agentId = process.env.ELEVENLABS_AGENT_ID;
+    if (!agentId) {
+      console.error("[Webhook] ELEVENLABS_AGENT_ID not configured");
       const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say>Sorry, there was a configuration error. Please try again later.</Say>
@@ -41,16 +45,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // Construct the full WebSocket URL with path
-    const wsUrl = `${websocketUrl}/media-stream`;
+    // Register call with ElevenLabs and get TwiML
+    const result = await registerCall({
+      agentId,
+      callSid,
+      fromNumber: from,
+      toNumber: to,
+      systemPrompt,
+    });
 
-    // Generate TwiML to connect to media stream
-    // Pass the 'to' field (the number being called) so the WebSocket server knows the phoneNumber
-    const twiml = generateMediaStreamTwiML(wsUrl, callSid, to, systemPrompt);
+    console.log(`[Webhook] ElevenLabs call registered for ${callSid}`);
 
-    console.log(`[Webhook] Returning TwiML to connect to: ${wsUrl}`);
-
-    return new NextResponse(twiml, {
+    // ElevenLabs register-call returns TwiML directly for Twilio integration
+    return new NextResponse(result.twiml, {
       headers: { "Content-Type": "application/xml" },
     });
   } catch (error) {
