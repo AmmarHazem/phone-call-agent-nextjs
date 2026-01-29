@@ -1,36 +1,173 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Phone Call Agent
 
-## Getting Started
+An AI-powered phone call agent application that enables users to initiate voice calls from a web interface and have real-time conversations with an AI assistant. The application bridges web browsers with phone calls via **Twilio** and **ElevenLabs Conversational AI**.
 
-First, run the development server:
+## Features
+
+- **Initiate Outbound Calls**: Enter a phone number in the web UI and the system places an outbound call using Twilio
+- **Real-time Voice Conversation**: AI assistant handles the conversation automatically once the call is answered
+- **Live Transcript Display**: The web UI shows a real-time transcript of the conversation
+- **Custom AI Prompts**: Customize the system prompt before initiating a call to guide the AI's behavior
+- **Call Status Tracking**: Real-time call status updates (initiating, ringing, in-progress, completed, etc.)
+- **Call Duration Counter**: Shows elapsed time during active calls
+- **Call Control**: End call button to terminate conversations
+
+## Tech Stack
+
+- **Next.js 16** - React framework with API routes
+- **React 19** - UI components
+- **TypeScript** - Type safety
+- **Tailwind CSS 4** - Styling
+- **Twilio SDK** - Phone call management (PSTN integration)
+- **ElevenLabs API** - Conversational AI voice agent
+
+## Project Structure
+
+```
+phone-call-agent/
+├── app/                          # Next.js App Router
+│   ├── page.tsx                  # Main UI page
+│   ├── layout.tsx                # Root layout
+│   ├── globals.css               # Global styles
+│   └── api/                      # API Routes
+│       ├── call/
+│       │   ├── initiate/         # Initiates outbound calls
+│       │   ├── webhook/          # Twilio voice webhook
+│       │   ├── status/           # Call status updates
+│       │   └── events/           # SSE stream for real-time updates
+│       └── elevenlabs/
+│           └── webhook/          # ElevenLabs event webhook
+├── components/                   # React Components
+│   ├── PhoneDialer.tsx           # Phone input & system prompt
+│   ├── CallStatus.tsx            # Call status display
+│   ├── Transcript.tsx            # Real-time conversation
+│   └── CallControls.tsx          # End call button
+├── hooks/
+│   └── useCall.tsx               # Call state management
+├── lib/                          # Utilities
+│   ├── twilio.ts                 # Twilio client
+│   ├── elevenlabs.ts             # ElevenLabs API
+│   └── sse-manager.ts            # SSE event broadcasting
+└── types/
+    └── call.ts                   # TypeScript interfaces
+```
+
+## Prerequisites
+
+- Node.js 18+
+- [Twilio Account](https://www.twilio.com) with a phone number
+- [ElevenLabs Account](https://elevenlabs.io) with a Conversational AI agent
+- [ngrok](https://ngrok.com) (for local development)
+
+## Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your credentials:
+
+```bash
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_PHONE_NUMBER=+1234567890
+
+# ElevenLabs Configuration
+ELEVENLABS_API_KEY=sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ELEVENLABS_AGENT_ID=agent_xxxxxxxxxxxxxxxxxxxxxxxx
+
+# Application URL (use ngrok for local development)
+NEXT_PUBLIC_APP_URL=https://your-ngrok-url.ngrok.io
+```
+
+### 3. Configure Twilio
+
+1. Create an account at https://www.twilio.com
+2. Purchase a phone number with Voice capability
+3. Get Account SID and Auth Token from the Console
+4. Configure your phone number's voice settings:
+   - **Voice webhook URL**: `{NEXT_PUBLIC_APP_URL}/api/call/webhook`
+   - **Status callback URL**: `{NEXT_PUBLIC_APP_URL}/api/call/status`
+
+### 4. Configure ElevenLabs
+
+1. Create an account at https://elevenlabs.io
+2. Create a Conversational AI Agent
+3. Get your Agent ID and API Key
+4. Configure the webhook URL in ElevenLabs: `{NEXT_PUBLIC_APP_URL}/api/elevenlabs/webhook`
+
+## Running the Application
+
+### Terminal 1 - Start ngrok (for local development)
+
+```bash
+ngrok http 3000
+```
+
+Copy the HTTPS URL and update `NEXT_PUBLIC_APP_URL` in `.env.local`.
+
+### Terminal 2 - Start the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app runs at http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Usage
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Open http://localhost:3000 in your browser
+2. Enter a phone number (E.164 format: +1XXXXXXXXXX for US)
+3. Optionally customize the AI system prompt
+4. Click "Start Call"
+5. Answer the call on your phone
+6. Speak with the AI assistant
+7. Watch the transcript appear in real-time
+8. Click "End Call" to terminate
 
-## Learn More
+## How It Works
 
-To learn more about Next.js, take a look at the following resources:
+```
+Browser → POST /api/call/initiate → Twilio API (place call)
+                                         ↓
+              Twilio webhook → POST /api/call/webhook
+                                         ↓
+              Register with ElevenLabs → Return TwiML to Twilio
+                                         ↓
+              ElevenLabs handles voice conversation
+                                         ↓
+              Events → POST /api/elevenlabs/webhook
+                                         ↓
+              SSE Manager → Browser receives real-time updates
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Available Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Run production build
+npm run lint     # Run linter
+```
 
-## Deploy on Vercel
+## Phone Number Formats
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The application accepts various phone number formats:
+- E.164 format: `+14155552671` (recommended)
+- 10-digit US: `4155552671` (auto-formatted to +1)
+- 11-digit with country code: `14155552671` (auto-formatted to +1)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
