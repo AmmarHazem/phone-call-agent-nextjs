@@ -33,38 +33,6 @@ export async function initiateCall(
 }
 
 /**
- * Generate TwiML to connect the call to a media stream
- */
-export function generateMediaStreamTwiML(
-  websocketUrl: string,
-  callSid: string,
-  phoneNumber: string,
-  systemPrompt?: string
-): string {
-  // Build parameters
-  let parameters = `
-      <Parameter name="callSid" value="${callSid}" />
-      <Parameter name="phoneNumber" value="${phoneNumber}" />`;
-
-  // Add system prompt if provided (base64 encoded to handle special characters)
-  if (systemPrompt) {
-    const encodedPrompt = Buffer.from(systemPrompt).toString("base64");
-    parameters += `
-      <Parameter name="systemPrompt" value="${encodedPrompt}" />`;
-  }
-
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Connect>
-    <Stream url="${websocketUrl}">${parameters}
-    </Stream>
-  </Connect>
-</Response>`;
-
-  return twiml;
-}
-
-/**
  * End an active call
  */
 export async function endCall(callSid: string): Promise<void> {
