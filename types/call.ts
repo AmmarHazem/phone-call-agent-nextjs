@@ -9,6 +9,7 @@ export interface CallSession {
 }
 
 export type CallStatus =
+  | "idle"
   | "initiating"
   | "ringing"
   | "in-progress"

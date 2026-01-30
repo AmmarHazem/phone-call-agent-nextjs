@@ -7,7 +7,7 @@ import CallControls from "@/components/CallControls";
 import { useCall } from "@/hooks/useCall";
 
 export default function Home() {
-  const { state, initiateCall, endCall, isActive } = useCall();
+  const { state, callStatus, initiateCall, endCall, isActive } = useCall();
 
   const handleCall = async (phoneNumber: string, systemPrompt?: string) => {
     await initiateCall(phoneNumber, systemPrompt);
@@ -32,7 +32,7 @@ export default function Home() {
 
         {/* Phone Dialer or Call Status */}
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          {state.status === "idle" ? (
+          {callStatus.status?.status === "idle" ? (
             <PhoneDialer onCall={handleCall} disabled={false} />
           ) : (
             <div className="flex flex-col gap-4">
@@ -50,7 +50,7 @@ export default function Home() {
 
               {/* Call Status */}
               <CallStatus
-                status={state.status}
+                status={callStatus.status?.status ?? "idle"}
                 startTime={state.startTime}
               />
 
@@ -80,7 +80,7 @@ export default function Home() {
         </div>
 
         {/* Transcript */}
-        {state.status !== "idle" && (
+        {callStatus.status?.status !== "idle" && (
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Conversation
@@ -88,13 +88,6 @@ export default function Home() {
             <Transcript messages={state.transcript} />
           </div>
         )}
-
-        {/* Footer */}
-        <footer className="text-center text-sm text-zinc-500 dark:text-zinc-500">
-          <p>
-            Powered by Twilio, Deepgram, and OpenAI
-          </p>
-        </footer>
       </main>
     </div>
   );

@@ -13,7 +13,7 @@ export const twilioClient = twilio(accountSid, authToken);
 export async function initiateCall(
   toPhoneNumber: string,
   webhookUrl: string,
-  statusCallbackUrl: string
+  statusCallbackUrl: string,
 ): Promise<string> {
   if (!twilioPhoneNumber) {
     throw new Error("TWILIO_PHONE_NUMBER is not configured");
