@@ -15,20 +15,17 @@ export default function CallStatus({ status, startTime }: CallStatusProps) {
     if (!startTime || status !== "in-progress") {
       return;
     }
-
     const updateDuration = () => {
       const now = new Date();
       const diff = Math.floor((now.getTime() - startTime.getTime()) / 1000);
       const minutes = Math.floor(diff / 60);
       const seconds = diff % 60;
       setDuration(
-        `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+        `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`,
       );
     };
-
     updateDuration();
     const interval = setInterval(updateDuration, 1000);
-
     return () => clearInterval(interval);
   }, [startTime, status]);
 

@@ -7,9 +7,9 @@ import type {
   InitiateCallResponse,
   CallEvent,
 } from "@/types/call";
+import { useCallStatus, UseCallStatusResult } from "./useCallStatus";
 
 interface CallState {
-  status: CallStatus | "idle";
   callSid: string | null;
   phoneNumber: string | null;
   startTime: Date | null;
@@ -19,13 +19,13 @@ interface CallState {
 
 interface UseCallReturn {
   state: CallState;
+  isActive: boolean;
+  callStatus: UseCallStatusResult;
   initiateCall: (phoneNumber: string, systemPrompt?: string) => Promise<void>;
   endCall: () => Promise<void>;
-  isActive: boolean;
 }
 
 const initialState: CallState = {
-  status: "idle",
   callSid: null,
   phoneNumber: null,
   startTime: null,
@@ -37,12 +37,18 @@ export function useCall(): UseCallReturn {
   const [state, setState] = useState<CallState>(initialState);
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  const callStatusResult = useCallStatus({
+    callSid: state.callSid ?? undefined,
+  });
+  const { status: callStatus, setStatus: setCallStatus } = callStatusResult;
+
   const isActive =
-    state.status !== "idle" &&
-    state.status !== "completed" &&
-    state.status !== "failed" &&
-    state.status !== "busy" &&
-    state.status !== "no-answer";
+    !!callStatus?.status &&
+    callStatus?.status !== "idle" &&
+    callStatus?.status !== "completed" &&
+    callStatus?.status !== "failed" &&
+    callStatus?.status !== "busy" &&
+    callStatus?.status !== "no-answer";
 
   // Clean up SSE connection on unmount
   useEffect(() => {
@@ -69,7 +75,10 @@ export function useCall(): UseCallReturn {
 
         switch (data.type) {
           case "status":
-            const statusData = data.data as { status: CallStatus; timestamp: Date };
+            const statusData = data.data as {
+              status: CallStatus;
+              timestamp: Date;
+            };
             setState((prev) => ({
               ...prev,
               status: statusData.status,
@@ -95,7 +104,7 @@ export function useCall(): UseCallReturn {
             setState((prev) => {
               // Check if this message already exists (update) or is new
               const existingIndex = prev.transcript.findIndex(
-                (m) => m.id === transcriptData.message.id
+                (m) => m.id === transcriptData.message.id,
               );
 
               if (existingIndex >= 0) {
@@ -137,29 +146,26 @@ export function useCall(): UseCallReturn {
     async (phoneNumber: string, systemPrompt?: string) => {
       setState({
         ...initialState,
-        status: "initiating",
         phoneNumber,
       });
-
       try {
         const response = await fetch("/api/call/initiate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phoneNumber, systemPrompt }),
         });
-
         const data: InitiateCallResponse = await response.json();
-
         if (!data.success || !data.callSid) {
           throw new Error(data.message || "Failed to initiate call");
         }
-
         setState((prev) => ({
           ...prev,
           callSid: data.callSid!,
-          status: "initiating",
         }));
-
+        setCallStatus({
+          status: "initiating",
+          timestamp: new Date(),
+        });
         // Subscribe to events
         subscribeToEvents(data.callSid);
       } catch (error) {
@@ -167,39 +173,38 @@ export function useCall(): UseCallReturn {
           error instanceof Error ? error.message : "Failed to initiate call";
         setState((prev) => ({
           ...prev,
-          status: "failed",
           error: message,
         }));
+        setCallStatus({ status: "failed", timestamp: new Date() });
       }
     },
-    [subscribeToEvents]
+    [setCallStatus, subscribeToEvents],
   );
 
   // End the call
   const endCall = useCallback(async () => {
     if (!state.callSid) return;
-
     try {
+      await fetch("/api/call/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callSid: state.callSid }),
+      });
+      setCallStatus({ status: "completed", timestamp: new Date() });
       // Close SSE connection
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
-
-      // Note: In a production app, you'd also call an API to end the call via Twilio
-      // For now, we just update local state
-      setState((prev) => ({
-        ...prev,
-        status: "completed",
-      }));
     } catch (error) {
       console.error("[useCall] Error ending call:", error);
     }
-  }, [state.callSid]);
+  }, [setCallStatus, state.callSid]);
 
   return {
     state,
+    isActive,
+    callStatus: callStatusResult,
     initiateCall,
     endCall,
-    isActive,
   };
 }
