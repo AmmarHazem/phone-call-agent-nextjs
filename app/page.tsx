@@ -1,3 +1,7 @@
 export default function HomePage() {
-  return <div>Home</div>;
+  return (
+    <div className="h-full">
+      <p>Home</p>
+    </div>
+  );
 }
